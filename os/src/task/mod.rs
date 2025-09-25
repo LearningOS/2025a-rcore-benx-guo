@@ -22,6 +22,7 @@ use switch::__switch;
 pub use task::{TaskControlBlock, TaskStatus};
 
 pub use context::TaskContext;
+use crate::syscall::{SyscallCounter, SYSCALL_COUNT};
 
 /// The task manager, where all the tasks are managed.
 ///
@@ -54,10 +55,12 @@ lazy_static! {
         let mut tasks = [TaskControlBlock {
             task_cx: TaskContext::zero_init(),
             task_status: TaskStatus::UnInit,
+            syscall_times: [SyscallCounter::new(0); SYSCALL_COUNT],
         }; MAX_APP_NUM];
         for (i, task) in tasks.iter_mut().enumerate() {
             task.task_cx = TaskContext::goto_restore(init_app_cx(i));
             task.task_status = TaskStatus::Ready;
+            task.syscall_times = [SyscallCounter::new(0); SYSCALL_COUNT];
         }
         TaskManager {
             num_app,
@@ -168,4 +171,26 @@ pub fn suspend_current_and_run_next() {
 pub fn exit_current_and_run_next() {
     mark_current_exited();
     run_next_task();
+}
+
+/// Increment the syscall counter for the current task
+/// 
+/// # Arguments
+/// * `syscall_id` - The syscall ID to increment
+pub fn increment_syscall_counter(syscall_id: usize) {
+    let mut inner = TASK_MANAGER.inner.exclusive_access();
+    let current_task_index = inner.current_task;
+    let current_task = &mut inner.tasks[current_task_index];
+    current_task.find_syscall_counter(syscall_id).increment();
+}
+
+/// Get the count of syscalls for the current task
+/// 
+/// # Arguments
+/// * `syscall_id` - The syscall ID to get the count for
+pub fn get_syscall_count(syscall_id: usize) -> usize {
+    let mut inner = TASK_MANAGER.inner.exclusive_access();
+    let current_task_index = inner.current_task;
+    let current_task = &mut inner.tasks[current_task_index];
+    current_task.find_syscall_counter(syscall_id).get_count()
 }

@@ -38,8 +38,31 @@ pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
     0
 }
 
-// TODO: implement the syscall
+/// trace syscall
 pub fn sys_trace(_trace_request: usize, _id: usize, _data: usize) -> isize {
     trace!("kernel: sys_trace");
-    -1
+
+    match _trace_request {
+        0 => {
+            trace!("kernel: sys_trace read");
+            let read_ptr = unsafe { *(_id as *const u8) };
+            read_ptr as isize
+        }
+        1 => {
+            trace!("kernel: sys_trace write");
+            let write_ptr = _id as *mut u8;
+            unsafe {
+                write_ptr.write_volatile(_data as u8);
+            }
+            0
+        }
+        2 => {
+            trace!("kernel: sys_trace syscall");
+            _data as isize
+        }
+        _ => {
+            trace!("kernel: sys_trace invalid");
+            -1
+        }
+    }
 }
